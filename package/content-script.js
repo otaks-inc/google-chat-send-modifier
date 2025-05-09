@@ -10,7 +10,7 @@
   const DEFAULT_SEND_KEYS = { Alt: true, Shift: true, Ctrl: true, Meta: true };
   let sendKeys = { ...DEFAULT_SEND_KEYS };
 
-  chrome.storage.sync.get("sendKeys", (data) => {
+  chrome.storage.sync.get('sendKeys', data => {
     if (data.sendKeys) sendKeys = { ...DEFAULT_SEND_KEYS, ...data.sendKeys };
   });
 
@@ -23,16 +23,20 @@
   }
 
   function isCaretAfterAt(editable) {
-    if (editable.tagName === "TEXTAREA") {
+    if (editable.tagName === 'TEXTAREA') {
       const pos = editable.selectionStart;
-      return pos > 0 && editable.value[pos - 1] === "@";
+      return pos > 0 && editable.value[pos - 1] === '@';
     }
     const sel = editable.ownerDocument.getSelection();
     if (!sel || sel.rangeCount === 0) return false;
     const range = sel.getRangeAt(0);
     if (!range.collapsed) return false;
     const { startContainer: node, startOffset: offset } = range;
-    return node.nodeType === Node.TEXT_NODE && offset > 0 && node.data[offset - 1] === "@";
+    return (
+      node.nodeType === Node.TEXT_NODE &&
+      offset > 0 &&
+      node.data[offset - 1] === '@'
+    );
   }
 
   function isMentionActive(editable) {
@@ -45,8 +49,8 @@
   function getEditableAncestor(el) {
     while (el) {
       if (el.nodeType === 1) {
-        if (el.tagName === "TEXTAREA") return el;
-        if (el.getAttribute("contenteditable") === "true") return el;
+        if (el.tagName === 'TEXTAREA') return el;
+        if (el.getAttribute('contenteditable') === 'true') return el;
       }
       el = el.parentElement;
     }
@@ -54,12 +58,12 @@
   }
 
   function insertNewLine(target) {
-    if (target.tagName === "TEXTAREA") {
+    if (target.tagName === 'TEXTAREA') {
       const { selectionStart: s, selectionEnd: e, value } = target;
-      target.value = value.slice(0, s) + "\n" + value.slice(e);
+      target.value = value.slice(0, s) + '\n' + value.slice(e);
       target.selectionStart = target.selectionEnd = s + 1;
     } else {
-      document.execCommand("insertLineBreak");
+      document.execCommand('insertLineBreak');
     }
   }
 
@@ -68,12 +72,9 @@
    * ------------------------------------------------------------------ */
   function sendMessage(active) {
     const selectors = [
-      '[aria-label="Send"]',
-      '[aria-label="Send message"]',
-      '[data-tooltip*="Send"]',
-      '[aria-label="送信"]',
-      '[aria-label="メッセージを送信"]',
-      '[data-tooltip*="送信"]'
+      'button[data-id="update"]', //更新ボタン。
+      //更新ボタンがあるときにも送信ボタンは表示されているので、必ず更新を先に探すようにする。
+      'button[aria-label="メッセージを送信"]', //送信ボタン
     ];
     for (const sel of selectors) {
       const btn = document.querySelector(sel);
@@ -82,15 +83,18 @@
         return;
       }
     }
+
     /* ボタンが見つからない → Enter をサイト側へ委ねる */
-    active.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    active.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    );
   }
 
   /* ------------------------------------------------------------------ *
    * 5. キーハンドラ                                                    *
    * ------------------------------------------------------------------ */
   function onKeydown(e) {
-    if (e.key !== "Enter") return;
+    if (e.key !== 'Enter') return;
 
     const editable = getEditableAncestor(e.target);
     if (!editable) return;
@@ -101,10 +105,10 @@
 
     /* --- 送信 or 改行 ---------------------------------------------- */
     const mod =
-      (e.altKey && "Alt") ||
-      (e.shiftKey && "Shift") ||
-      (e.ctrlKey && "Ctrl") ||
-      (e.metaKey && "Meta") ||
+      (e.altKey && 'Alt') ||
+      (e.shiftKey && 'Shift') ||
+      (e.ctrlKey && 'Ctrl') ||
+      (e.metaKey && 'Meta') ||
       null;
 
     const isSend = mod ? sendKeys[mod] : false;
@@ -123,9 +127,9 @@
    * ------------------------------------------------------------------ */
   function inject(win) {
     try {
-      win.document.addEventListener("keydown", onKeydown, {
+      win.document.addEventListener('keydown', onKeydown, {
         capture: true,
-        passive: false
+        passive: false,
       });
     } catch (_) {
       /* cross-origin iframe は無視 */
@@ -134,11 +138,11 @@
 
   /* 自フレーム + 動的 iframe */
   inject(window);
-  new MutationObserver((muts) => {
-    muts.forEach((m) =>
-      m.addedNodes.forEach((n) => {
-        if (n.tagName === "IFRAME") {
-          n.addEventListener("load", () => inject(n.contentWindow));
+  new MutationObserver(muts => {
+    muts.forEach(m =>
+      m.addedNodes.forEach(n => {
+        if (n.tagName === 'IFRAME') {
+          n.addEventListener('load', () => inject(n.contentWindow));
         }
       })
     );
