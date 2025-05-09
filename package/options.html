@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <title>Chat Enter Key Modifier – 設定</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      line-height: 1.6;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
+
+    button {
+      padding: 0.4rem 1rem;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>送信に使う修飾キー</h1>
+  <form id="form">
+    <label><input type="checkbox" id="Alt"> Alt + Enter</label>
+    <label><input type="checkbox" id="Shift"> Shift + Enter</label>
+    <label><input type="checkbox" id="Ctrl"> Ctrl + Enter</label>
+    <label><input type="checkbox" id="Meta"> Cmd(⌘) / Meta + Enter</label>
+    <p>
+      <button type="submit">保存</button>
+      <span id="status" style="margin-left:1rem;color:green;"></span>
+    </p>
+  </form>
+
+  <script src="options.js"></script>
+</body>
+
+</html>

@@ -1,49 +1,80 @@
-// Google Chat で
-//   Enter            → 改行
-//   Shift+Enter      → 送信
-//   Ctrl+Enter       → 送信
-//   Cmd(⌘)+Enter     → 送信
-//
-// Linux / Windows / macOS すべて対応。
-// Gmail 連携版 (mail.google.com/chat/*) の iframe 内でも動作します。
+// Google Chat で：
+//   Enter                     → 改行        ※メンション候補中 / 直前が @ のときは確定
+//   Alt / Shift / Ctrl / Cmd + Enter
+//      └─ オプションで ON なら送信、OFF なら改行
 
 (() => {
-  /** 対象要素（textarea か contenteditable）を祖先へさかのぼって取得 */
+  /* ------------------------------------------------------------------ *
+   * 1. 送信キー設定のロード（Alt も対象）                               *
+   * ------------------------------------------------------------------ */
+  const DEFAULT_SEND_KEYS = { Alt: true, Shift: true, Ctrl: true, Meta: true };
+  let sendKeys = { ...DEFAULT_SEND_KEYS };
+
+  chrome.storage.sync.get("sendKeys", (data) => {
+    if (data.sendKeys) sendKeys = { ...DEFAULT_SEND_KEYS, ...data.sendKeys };
+  });
+
+  /* ------------------------------------------------------------------ *
+   * 2. メンション判定ユーティリティ                                    *
+   * ------------------------------------------------------------------ */
+  function isMentionPopupVisible() {
+    const box = document.querySelector('div[role="listbox"]');
+    return box && box.offsetParent !== null;
+  }
+
+  function isCaretAfterAt(editable) {
+    if (editable.tagName === "TEXTAREA") {
+      const pos = editable.selectionStart;
+      return pos > 0 && editable.value[pos - 1] === "@";
+    }
+    const sel = editable.ownerDocument.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return false;
+    const { startContainer: node, startOffset: offset } = range;
+    return node.nodeType === Node.TEXT_NODE && offset > 0 && node.data[offset - 1] === "@";
+  }
+
+  function isMentionActive(editable) {
+    return isMentionPopupVisible() || isCaretAfterAt(editable);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 3. 入力フィールドユーティリティ                                    *
+   * ------------------------------------------------------------------ */
   function getEditableAncestor(el) {
     while (el) {
       if (el.nodeType === 1) {
-        if (el.tagName === 'TEXTAREA') return el;
-        if (el.getAttribute('contenteditable') === 'true') return el;
+        if (el.tagName === "TEXTAREA") return el;
+        if (el.getAttribute("contenteditable") === "true") return el;
       }
       el = el.parentElement;
     }
     return null;
   }
 
-  /** 改行をカーソル位置に挿入 */
   function insertNewLine(target) {
-    if (target.tagName === 'TEXTAREA') {
+    if (target.tagName === "TEXTAREA") {
       const { selectionStart: s, selectionEnd: e, value } = target;
-      target.value = value.slice(0, s) + '\n' + value.slice(e);
+      target.value = value.slice(0, s) + "\n" + value.slice(e);
       target.selectionStart = target.selectionEnd = s + 1;
     } else {
-      document.execCommand('insertLineBreak');
+      document.execCommand("insertLineBreak");
     }
   }
 
-  /** 送信ボタンをクリック。見つからなければ Alt+Enter を擬似送信 */
+  /* ------------------------------------------------------------------ *
+   * 4. 送信処理                                                        *
+   * ------------------------------------------------------------------ */
   function sendMessage(active) {
     const selectors = [
-      // 英語 UI
       '[aria-label="Send"]',
       '[aria-label="Send message"]',
       '[data-tooltip*="Send"]',
-      // 日本語 UI
       '[aria-label="送信"]',
       '[aria-label="メッセージを送信"]',
-      '[data-tooltip*="送信"]',
+      '[data-tooltip*="送信"]'
     ];
-
     for (const sel of selectors) {
       const btn = document.querySelector(sel);
       if (btn) {
@@ -51,62 +82,63 @@
         return;
       }
     }
-
-    /* フォールバック：
-       Chat ネイティブでは Alt+Enter が「送信」扱いなので
-       Alt フラグ付きの Enter を投げる */
-    active.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        key: 'Enter',
-        altKey: true,
-        bubbles: true,
-      })
-    );
+    /* ボタンが見つからない → Enter をサイト側へ委ねる */
+    active.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   }
 
-  /** capture フェーズでキーを横取り */
+  /* ------------------------------------------------------------------ *
+   * 5. キーハンドラ                                                    *
+   * ------------------------------------------------------------------ */
   function onKeydown(e) {
-    if (e.key !== 'Enter' || e.altKey) return; // Alt+Enter は素通し
+    if (e.key !== "Enter") return;
+
     const editable = getEditableAncestor(e.target);
     if (!editable) return;
 
-    // ---------- 改行 ----------
-    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      e.stopImmediatePropagation(); // 他ハンドラも止める
-      insertNewLine(editable);
-      return;
-    }
+    /* --- メンション確定 (修飾なし Enter) ----------------------------- */
+    const noMod = !e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey;
+    if (noMod && isMentionActive(editable)) return; // ネイティブに任せる
 
-    // ---------- 送信 ----------
-    if (e.shiftKey || e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
+    /* --- 送信 or 改行 ---------------------------------------------- */
+    const mod =
+      (e.altKey && "Alt") ||
+      (e.shiftKey && "Shift") ||
+      (e.ctrlKey && "Ctrl") ||
+      (e.metaKey && "Meta") ||
+      null;
+
+    const isSend = mod ? sendKeys[mod] : false;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (isSend) {
       sendMessage(editable);
+    } else {
+      insertNewLine(editable);
     }
   }
 
-  /** 任意の window にリスナーを注入 */
+  /* ------------------------------------------------------------------ *
+   * 6. window への注入                                                 *
+   * ------------------------------------------------------------------ */
   function inject(win) {
     try {
-      win.document.addEventListener('keydown', onKeydown, {
-        capture: true, // いちばん外側で取得
-        passive: false, // preventDefault() を許可
+      win.document.addEventListener("keydown", onKeydown, {
+        capture: true,
+        passive: false
       });
     } catch (_) {
-      /* クロスオリジン iframe などは無視 */
+      /* cross-origin iframe は無視 */
     }
   }
 
-  // ① 自ページ
+  /* 自フレーム + 動的 iframe */
   inject(window);
-
-  // ② 動的に追加される iframe にも自動で注入
-  new MutationObserver(muts => {
-    muts.forEach(m =>
-      m.addedNodes.forEach(n => {
-        if (n.tagName === 'IFRAME') {
-          n.addEventListener('load', () => inject(n.contentWindow));
+  new MutationObserver((muts) => {
+    muts.forEach((m) =>
+      m.addedNodes.forEach((n) => {
+        if (n.tagName === "IFRAME") {
+          n.addEventListener("load", () => inject(n.contentWindow));
         }
       })
     );
