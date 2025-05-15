@@ -72,10 +72,11 @@
    * ------------------------------------------------------------------ */
   function sendMessage(active) {
     const selectors = [
-      'button[data-id="update"]', //更新ボタン。
-      //更新ボタンがあるときにも送信ボタンは表示されているので、必ず更新を先に探すようにする。
+      'button[jsname="GBTyxb"]', //スレッドの送信ボタン
+      'button[data-id="update"]', //更新ボタン
       'button[aria-label="メッセージを送信"]', //送信ボタン
     ];
+
     for (const sel of selectors) {
       const btn = document.querySelector(sel);
       if (btn) {
