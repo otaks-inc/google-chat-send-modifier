@@ -95,6 +95,7 @@
    * 5. キーハンドラ                                                    *
    * ------------------------------------------------------------------ */
   function onKeydown(e) {
+    if (e.isComposing) return; //IME変換中は無視
     if (e.key !== 'Enter') return;
 
     const editable = getEditableAncestor(e.target);
