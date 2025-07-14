@@ -57,13 +57,33 @@
     return null;
   }
 
+  // content-script.js より
   function insertNewLine(target) {
+    // 1) <textarea> の場合：直前行のリストマーカーをコピーして挿入
     if (target.tagName === 'TEXTAREA') {
       const { selectionStart: s, selectionEnd: e, value } = target;
-      target.value = value.slice(0, s) + '\n' + value.slice(e);
-      target.selectionStart = target.selectionEnd = s + 1;
-    } else {
-      document.execCommand('insertLineBreak');
+      // カーソル前テキストから「* , + , -」等のマーカー行末を拾う
+      const before = value.slice(0, s);
+      const m = before.match(/(^|\n)([ \t]*([*+\-]\s+))$/);
+      const prefix = m ? m[2] : '';
+      // 改行＋マーカーを挿入
+      target.value = value.slice(0, s) + '\n' + prefix + value.slice(e);
+      // カーソル位置を新しい行先頭に移動
+      const newPos = s + 1 + prefix.length;
+      target.selectionStart = target.selectionEnd = newPos;
+    }
+    // 2) contenteditable 要素（Google Chat の入力欄など）の場合
+    else {
+      const doc = target.ownerDocument;
+      // 現在カーソルが <ul> の中かを判定
+      const inList = doc.queryCommandState('insertUnorderedList');
+      if (inList) {
+        // リスト内なら標準の段落分割（新しい <li> を生成）
+        doc.execCommand('insertParagraph');
+      } else {
+        // リスト外なら Shift+Enter 相当で <br> を挿入
+        doc.execCommand('insertLineBreak');
+      }
     }
   }
 
