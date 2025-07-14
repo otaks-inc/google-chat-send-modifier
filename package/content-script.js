@@ -72,11 +72,27 @@
    * ------------------------------------------------------------------ */
   function sendMessage(active) {
     const selectors = [
-      'button[jsname="GBTyxb"]', //スレッドの送信ボタン
-      'button[data-id="update"]', //更新ボタン
-      'button[aria-label="メッセージを送信"]', //送信ボタン
+      'button[jsname="GBTyxb"]',
+      'button[data-id="update"]',
+      'button[aria-label="メッセージを送信"]',
     ];
 
+    // フォーカス中要素から親要素を順にたどり、
+    // その領域内にマッチするボタンを探す
+    let el = active;
+    while (el) {
+      el = el.parentElement;
+      if (!el) break;
+      for (const sel of selectors) {
+        const btn = el.querySelector(sel);
+        if (btn) {
+          btn.click();
+          return;
+        }
+      }
+    }
+
+    // 見つからなければドキュメント全体からフォールバック検索
     for (const sel of selectors) {
       const btn = document.querySelector(sel);
       if (btn) {
@@ -85,7 +101,7 @@
       }
     }
 
-    /* ボタンが見つからない → Enter をサイト側へ委ねる */
+    // それでもなければ Enter キーでフォールバック
     active.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
     );
