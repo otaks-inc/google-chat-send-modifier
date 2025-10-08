@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Google Chat Enter Key Modifier",
   "description": "Enter で改行、設定した修飾キー + Enter で送信",
-  "version": "2.0.6",
+  "version": "2.1.0",
 
   "icons": {
     "16": "icons/icon16.png",
